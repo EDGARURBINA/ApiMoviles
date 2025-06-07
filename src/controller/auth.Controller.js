@@ -39,8 +39,9 @@ export const signin = async (req, res, next) => {
     }
 };
 
+
+
 export const signup = async (req, res, next) => {
-    console.log("Datos recibidos en signup:", req.body);
   try {
     const { name, email, password, phone, notes, age, address } = req.body;
 
@@ -50,15 +51,10 @@ export const signup = async (req, res, next) => {
       return res.status(400).json({ message: "El correo electrónico ya está registrado" });
     }
 
+    // Encriptar la contraseña
     const hashedPassword = await User.encryptPassword(password);
 
-    // Asignar siempre el rol "Trabajador"
-    const roleExists = await Role.findOne({ name: "Trabajador" });
-    if (!roleExists) {
-      return res.status(400).json({ message: `El rol Trabajador no existe` });
-    }
-
-    // Crear nuevo usuario
+    // Crear nuevo usuario sin roles
     const newUser = new User({
       name,
       email,
@@ -66,16 +62,17 @@ export const signup = async (req, res, next) => {
       phone,
       notes,
       age,
-      address,
-      roles: [roleExists._id]  // Aquí se asigna el rol por defecto
+      address
     });
 
     const savedUser = await newUser.save();
 
+    // Crear token JWT con el id del usuario
     const token = jwt.sign({ id: savedUser._id }, config.SECRET, {
       expiresIn: 86400, // 24 horas
     });
 
+    // Responder con éxito y datos del usuario
     res.status(201).json({
       message: "Usuario registrado con éxito",
       token,
@@ -83,7 +80,10 @@ export const signup = async (req, res, next) => {
         id: savedUser._id,
         name: savedUser.name,
         email: savedUser.email,
-        roles: savedUser.roles,
+        phone: savedUser.phone,
+        notes: savedUser.notes,
+        age: savedUser.age,
+        address: savedUser.address,
       },
     });
   } catch (error) {
