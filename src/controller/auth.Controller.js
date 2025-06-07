@@ -41,7 +41,7 @@ export const signin = async (req, res, next) => {
 
 export const signup = async (req, res, next) => {
     try {
-        const { name, email, password, roles, phone , notes, age} = req.body;
+        const { name, email, password, roles, phone , notes, age, address} = req.body;
 
         console.log("Rol recibido:", roles);
         console.log("Tipo de dato del rol:", typeof roles);
