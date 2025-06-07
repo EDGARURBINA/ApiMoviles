@@ -92,6 +92,19 @@ export const signup = async (req, res, next) => {
 };
 
 
+export const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find().populate("roles", "name"); 
+    res.status(200).json(users);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error al obtener los usuarios", error });
+  }
+};
+
+
+
+
 // Función para actualizar un usuario
 export const updateUser = async (req, res) => {
     try {
