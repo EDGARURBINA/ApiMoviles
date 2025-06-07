@@ -1,4 +1,3 @@
-
 import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
 
@@ -17,28 +16,19 @@ const userSchema = new Schema({
   address: {
     type: String,
   }, 
-
   notes: {
     type: String,
   }, 
-  phone:{
+  phone: {
     type: String,
-    
   },
   age: {
     type: Number, 
-    },
-    
+  },
   password: {
     type: String,
     required: true,
   },
-  roles: [
-    {
-      type: Schema.Types.ObjectId,
-      ref: 'Role',
-    },
-  ],
 }, { timestamps: true });
 
 userSchema.statics.encryptPassword = async function (password) {
