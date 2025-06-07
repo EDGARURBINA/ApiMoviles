@@ -40,85 +40,56 @@ export const signin = async (req, res, next) => {
 };
 
 export const signup = async (req, res, next) => {
-    try {
-        const { name, email, password, roles, phone , notes, age, address} = req.body;
-
-        console.log("Rol recibido:", roles);
-        console.log("Tipo de dato del rol:", typeof roles);
-
-        const userExists = await User.findOne({ email });
-        if (userExists) {
-            res.status(400).json({ message: "El correo electrónico ya está registrado" });
-            return;
-        }
-
-        const hashedPassword = await User.encryptPassword(password);
-
-        let userRole = "Trabajador";
-
-        if (roles) {
-            const normalizedRole = typeof roles === 'string' ? roles.trim() : '';
-            if (normalizedRole === "Admin" || normalizedRole === "Trabajador") {
-                userRole = normalizedRole;
-            }
-        }
-
-        console.log("Rol que se buscará en la BD:", userRole);
-
-        const roleExists = await Role.findOne({ name: userRole });
-        if (!roleExists) {
-            res.status(400).json({ message: `El rol ${userRole} no existe` });
-            return;
-        }
-
-        console.log("ID del rol encontrado:", roleExists._id);
-
-        const newUser = new User({
-            name,
-            email,
-            password: hashedPassword,
-            phone, 
-            roles: [roleExists._id],
-            notes,
-            age,
-            address
-        });
-
-        const savedUser = await newUser.save();
-        console.log("Usuario creado con éxito:", savedUser);
-
-        const token = jwt.sign({ id: savedUser._id }, config.SECRET, {
-            expiresIn: 86400, // 24 horas
-        });
-
-        res.status(201).json({
-            message: "Usuario registrado con éxito",
-            token,
-            user: {
-                id: savedUser._id,
-                name: savedUser.name,
-                email: savedUser.email,
-                roles: savedUser.roles,
-            },
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Hubo un error en el servidor", error });
-    }
-};
-
-
-export const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().populate("roles", "name"); 
-    res.status(200).json(users);
+    const { name, email, password, phone, notes, age, address } = req.body;
+
+    // Verifica si el usuario ya existe
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ message: "El correo electrónico ya está registrado" });
+    }
+
+    const hashedPassword = await User.encryptPassword(password);
+
+    // Asignar siempre el rol "Trabajador"
+    const roleExists = await Role.findOne({ name: "Trabajador" });
+    if (!roleExists) {
+      return res.status(400).json({ message: `El rol Trabajador no existe` });
+    }
+
+    // Crear nuevo usuario
+    const newUser = new User({
+      name,
+      email,
+      password: hashedPassword,
+      phone,
+      notes,
+      age,
+      address,
+      roles: [roleExists._id]  // Aquí se asigna el rol por defecto
+    });
+
+    const savedUser = await newUser.save();
+
+    const token = jwt.sign({ id: savedUser._id }, config.SECRET, {
+      expiresIn: 86400, // 24 horas
+    });
+
+    res.status(201).json({
+      message: "Usuario registrado con éxito",
+      token,
+      user: {
+        id: savedUser._id,
+        name: savedUser.name,
+        email: savedUser.email,
+        roles: savedUser.roles,
+      },
+    });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Error al obtener los usuarios", error });
+    res.status(500).json({ message: "Hubo un error en el servidor", error });
   }
 };
-
-
 
 
 // Función para actualizar un usuario
