@@ -40,6 +40,7 @@ export const signin = async (req, res, next) => {
 };
 
 export const signup = async (req, res, next) => {
+    console.log("Datos recibidos en signup:", req.body);
   try {
     const { name, email, password, phone, notes, age, address } = req.body;
 
