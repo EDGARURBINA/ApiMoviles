@@ -105,12 +105,10 @@ export const getAllUsers = async (req, res) => {
 
 
 
-
-// Función para actualizar un usuario
 export const updateUser = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, email, password, roles, phone } = req.body;
+        const { name, email, password, roles, phone, address, age, notes } = req.body;
 
         // Validar que el ID sea válido
         if (!id.match(/^[0-9a-fA-F]{24}$/)) {
@@ -137,6 +135,12 @@ export const updateUser = async (req, res) => {
         if (name) updateData.name = name;
         if (email) updateData.email = email;
         if (phone !== undefined) updateData.phone = phone; // Permitir valores vacíos
+        if (address !== undefined) updateData.address = address; // Nuevo campo
+        if (age !== undefined) updateData.age = age; // Nuevo campo
+        if (notes !== undefined) updateData.notes = notes; // Nuevo campo
+        if (address !== undefined) updateData.address = address; // Nuevo campo
+        if (age !== undefined) updateData.age = age; // Nuevo campo
+        if (notes !== undefined) updateData.notes = notes; // Nuevo campo
 
         // Si se proporciona una nueva contraseña, encriptarla
         if (password) {
@@ -183,6 +187,9 @@ export const updateUser = async (req, res) => {
                 name: updatedUser.name,
                 email: updatedUser.email,
                 phone: updatedUser.phone,
+                address: updatedUser.address, // Nuevo campo en respuesta
+                age: updatedUser.age, // Nuevo campo en respuesta
+                notes: updatedUser.notes, // Nuevo campo en respuesta
                 roles: updatedUser.roles,
                 updatedAt: updatedUser.updatedAt
             },
