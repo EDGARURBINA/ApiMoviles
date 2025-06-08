@@ -173,7 +173,7 @@ export const updateUser = async (req, res) => {
 
         // Actualizar el usuario
         const updatedUser = await User.findByIdAndUpdate(
-            id,
+            _id,
             updateData,
             { new: true, runValidators: true }
         ).populate("roles", "name");
@@ -183,7 +183,7 @@ export const updateUser = async (req, res) => {
         res.status(200).json({
             message: "Usuario actualizado con éxito",
             user: {
-                id: updatedUser._id,
+                _id: updatedUser._id,
                 name: updatedUser.name,
                 email: updatedUser.email,
                 phone: updatedUser.phone,
