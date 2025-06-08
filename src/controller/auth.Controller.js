@@ -94,29 +94,11 @@ export const signup = async (req, res, next) => {
 
 export const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().populate("roles", "name"); 
-    
-    // Formatear la respuesta para que sea consistente
-    const formattedUsers = users.map(user => ({
-      id: user._id.toString(), // Convertir _id a string
-      name: user.name,
-      email: user.email,
-      phone: user.phone || "",
-      address: user.address || "",
-      age: user.age || 0,
-      notes: user.notes || "",
-      roles: user.roles,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt
-    }));
-    
-    console.log("Usuarios formateados:", formattedUsers); // LOG PARA DEBUG
-    console.log("Primer usuario ID:", formattedUsers[0]?.id); // LOG PARA DEBUG
-    
-    res.status(200).json(formattedUsers);
+    const users = await User.find();
+    res.status(200).json(users);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Error al obtener los usuarios", error });
+    res.status(500).json({ message: "Error al obtener los usuarios" });
   }
 };
 
