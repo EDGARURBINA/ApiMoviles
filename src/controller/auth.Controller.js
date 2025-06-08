@@ -173,7 +173,7 @@ export const updateUser = async (req, res) => {
 
         // Actualizar el usuario
         const updatedUser = await User.findByIdAndUpdate(
-            _id,
+            id,
             updateData,
             { new: true, runValidators: true }
         ).populate("roles", "name");
