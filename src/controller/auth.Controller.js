@@ -103,127 +103,47 @@ export const getAllUsers = async (req, res) => {
 };
 
 
+
+
+
+
+
 export const updateUser = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { name, email, password, roles, phone, address, age, notes } = req.body;
+  try {
+    const { id } = req.params;
+    const { name, email, password, phone, address, age, notes } = req.body;
 
-        // Validar que el ID sea válido
-        if (!id.match(/^[0-9a-fA-F]{24}$/)) {
-            return res.status(400).json({ message: "ID de usuario inválido" });
-        }
-
-        // Verificar que el usuario existe
-        const userExists = await User.findById(id);
-        if (!userExists) {
-            return res.status(404).json({ message: "Usuario no encontrado" });
-        }
-
-        // Verificar si el email ya está en uso por otro usuario
-        if (email && email !== userExists.email) {
-            const emailExists = await User.findOne({ email, _id: { $ne: id } });
-            if (emailExists) {
-                return res.status(400).json({ message: "El correo electrónico ya está registrado por otro usuario" });
-            }
-        }
-
-        // Preparar los datos a actualizar
-        const updateData = {};
-        
-        if (name) updateData.name = name;
-        if (email) updateData.email = email;
-        if (phone !== undefined) updateData.phone = phone; // Permitir valores vacíos
-        if (address !== undefined) updateData.address = address; // Nuevo campo
-        if (age !== undefined) updateData.age = age; // Nuevo campo
-        if (notes !== undefined) updateData.notes = notes; // Nuevo campo
-        if (address !== undefined) updateData.address = address; // Nuevo campo
-        if (age !== undefined) updateData.age = age; // Nuevo campo
-        if (notes !== undefined) updateData.notes = notes; // Nuevo campo
-
-        // Si se proporciona una nueva contraseña, encriptarla
-        if (password) {
-            updateData.password = await User.encryptPassword(password);
-        }
-
-        // Manejar actualización de roles SOLO si se envían en la petición
-        if (roles !== undefined) {
-            let userRole = roles;
-            
-            // Normalizar el rol
-            if (typeof roles === 'string') {
-                userRole = roles.trim();
-            }
-
-            // Validar que el rol sea válido
-            if (userRole !== "Admin" && userRole !== "Trabajador") {
-                return res.status(400).json({ message: "Rol inválido. Debe ser 'Admin' o 'Trabajador'" });
-            }
-
-            // Buscar el rol en la base de datos
-            const roleExists = await Role.findOne({ name: userRole });
-            if (!roleExists) {
-                return res.status(400).json({ message: `El rol ${userRole} no existe` });
-            }
-
-            updateData.roles = [roleExists._id];
-        }
-        // Si no se envían roles, se mantienen los existentes (no se actualiza el campo)
-
-        // Actualizar el usuario
-        const updatedUser = await User.findByIdAndUpdate(
-            id,
-            updateData,
-            { new: true, runValidators: true }
-        ).populate("roles", "name");
-
-        console.log("Usuario actualizado con éxito:", updatedUser);
-
-        res.status(200).json({
-            message: "Usuario actualizado con éxito",
-            user: {
-                id: updatedUser._id,
-                name: updatedUser.name,
-                email: updatedUser.email,
-                phone: updatedUser.phone,
-                address: updatedUser.address, // Nuevo campo en respuesta
-                age: updatedUser.age, // Nuevo campo en respuesta
-                notes: updatedUser.notes, // Nuevo campo en respuesta
-                roles: updatedUser.roles,
-                updatedAt: updatedUser.updatedAt
-            },
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Error al actualizar el usuario", error });
+    // Validar ID
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ message: "ID inválido" });
     }
+
+    // Preparar datos a actualizar
+    const updateData = { name, email, phone, address, age, notes };
+
+    // Si se envía una nueva contraseña, encriptarla
+    if (password) {
+      updateData.password = await User.encryptPassword(password);
+    }
+
+    // Actualizar usuario
+    const updatedUser = await User.findByIdAndUpdate(id, updateData, {
+      new: true,
+    });
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
+    res.status(200).json({
+      message: "Usuario actualizado",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error al actualizar usuario" });
+  }
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
