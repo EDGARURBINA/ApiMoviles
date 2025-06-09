@@ -67,12 +67,12 @@ export const signup = async (req, res, next) => {
 
     const savedUser = await newUser.save();
 
-    // Crear token JWT con el id del usuario
+  
     const token = jwt.sign({ id: savedUser._id }, config.SECRET, {
       expiresIn: 86400, // 24 horas
     });
 
-    // Responder con éxito y datos del usuario
+    
     res.status(201).json({
       message: "Usuario registrado con éxito",
       token,
@@ -113,20 +113,16 @@ export const updateUser = async (req, res) => {
     const { id } = req.params;
     const { name, email, password, phone, address, age, notes } = req.body;
 
-    // Validar ID
     if (!id.match(/^[0-9a-fA-F]{24}$/)) {
       return res.status(400).json({ message: "ID inválido" });
     }
 
-    // Preparar datos a actualizar
     const updateData = { name, email, phone, address, age, notes };
 
-    // Si se envía una nueva contraseña, encriptarla
     if (password) {
       updateData.password = await User.encryptPassword(password);
     }
 
-    // Actualizar usuario
     const updatedUser = await User.findByIdAndUpdate(id, updateData, {
       new: true,
     });
