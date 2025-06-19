@@ -5,7 +5,7 @@ import { verifyToken, isAdmin } from "../middlewares/authJwt.js";
 
 const router = Router();
 
-router.post("/signin", authCtrl.signin);
+router.post("/signin", verifyToken, authCtrl.signin);
 router.post("/signup", authCtrl.signup);
 router.get("/users", authCtrl.getAllUsers)
 router.delete("/users/:id", authCtrl.deleteUser)

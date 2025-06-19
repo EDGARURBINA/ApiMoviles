@@ -4,6 +4,8 @@ import config from '../config.js';
 import User from '../models/User.js';
 import Role from '../models/Role.js';
 
+
+
 export const signin = async (req, res, next) => {
     try {
         const userFound = await User.findOne({ email: req.body.email }).populate("roles");
