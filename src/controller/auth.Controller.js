@@ -43,7 +43,19 @@ export const signin = async (req, res, next) => {
 
 export const signup = async (req, res, next) => {
   try {
+    // Cuando usamos multipart/form-data, los datos vienen en req.body pero pueden necesitar procesamiento
     const { name, email, password, phone, notes, age, address } = req.body;
+    
+    // Debug: ver qué está llegando
+    console.log('req.body:', req.body);
+    console.log('req.file:', req.file);
+    
+    // Validación manual ya que los datos vienen como string desde form-data
+    if (!name || !email || !password) {
+      return res.status(400).json({ 
+        message: "Los campos name, email y password son obligatorios" 
+      });
+    }
 
     // Verifica si el usuario ya existe
     const userExists = await User.findOne({ email });
@@ -79,13 +91,13 @@ export const signup = async (req, res, next) => {
 
     // Crear nuevo usuario
     const newUser = new User({
-      name,
-      email,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
       password: hashedPassword,
-      phone,
-      notes,
-      age,
-      address,
+      phone: phone || '',
+      notes: notes || '',
+      age: age ? parseInt(age) : null,
+      address: address || '',
       imageUrl,
       imageFileId
     });

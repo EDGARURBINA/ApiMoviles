@@ -6,33 +6,44 @@ const { Schema, model } = mongoose;
 const userSchema = new Schema({
   name: {
     type: String,
-    required: true,
+    required: [true, 'El nombre es obligatorio'],
+    trim: true,
   },
   email: {
     type: String,
-    required: true,
+    required: [true, 'El email es obligatorio'],
     unique: true,
+    lowercase: true,
+    trim: true,
   },
   address: {
     type: String,
+    default: '',
   }, 
   notes: {
     type: String,
+    default: '',
   }, 
   phone: {
     type: String,
+    default: '',
   },
   age: {
-    type: Number, 
+    type: Number,
+    min: [1, 'La edad debe ser mayor a 0'],
+    max: [120, 'La edad debe ser menor a 120'],
   },
   password: {
     type: String,
+    required: [true, 'La contraseña es obligatoria'],
   },
   imageUrl: {
-    type: String, // Corregido: faltaba 'type:'
+    type: String,
+    default: null,
   },
   imageFileId: {
-    type: String, // Para guardar el ID del archivo en Google Drive
+    type: String,
+    default: null,
   },
   roles: [{
     type: Schema.Types.ObjectId,
