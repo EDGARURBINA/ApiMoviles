@@ -27,14 +27,17 @@ const userSchema = new Schema({
   },
   password: {
     type: String,
-    
   },
-  roles: [
-  {
+  imageUrl: {
+    type: String, // Corregido: faltaba 'type:'
+  },
+  imageFileId: {
+    type: String, // Para guardar el ID del archivo en Google Drive
+  },
+  roles: [{
     type: Schema.Types.ObjectId,
     ref: 'Role',
-  },
-],
+  }],
 }, { timestamps: true });
 
 userSchema.statics.encryptPassword = async function (password) {
@@ -47,5 +50,4 @@ userSchema.statics.comparePassword = async function (password, receivedPassword)
 };
 
 const User = model('User', userSchema);
-
 export default User;

@@ -1,10 +1,9 @@
-
 import jwt from 'jsonwebtoken';
 import config from '../config.js'; 
 import User from '../models/User.js';
 import Role from '../models/Role.js';
-
-
+import { uploadImageToDrive, deleteImageFromDrive } from '../services/googleDriveService.js';
+import fs from 'fs';
 
 export const signin = async (req, res, next) => {
     try {
@@ -22,7 +21,7 @@ export const signin = async (req, res, next) => {
         }
 
         const token = jwt.sign({ id: userFound._id }, config.SECRET, {
-            expiresIn: 86400, // 24 horas
+            expiresIn: 86400,
         });
 
         res.status(200).json({
@@ -32,6 +31,7 @@ export const signin = async (req, res, next) => {
                 id: userFound._id,
                 name: userFound.name,
                 email: userFound.email,
+                imageUrl: userFound.imageUrl,
                 roles: userFound.roles,
             },
         });
@@ -40,8 +40,6 @@ export const signin = async (req, res, next) => {
         res.status(500).json({ message: "Hubo un error en el servidor", error });
     }
 };
-
-
 
 export const signup = async (req, res, next) => {
   try {
@@ -56,7 +54,30 @@ export const signup = async (req, res, next) => {
     // Encriptar la contraseña
     const hashedPassword = await User.encryptPassword(password);
 
-    // Crear nuevo usuario sin roles
+    let imageUrl = null;
+    let imageFileId = null;
+
+    // Si hay una imagen, subirla a Google Drive
+    if (req.file) {
+      try {
+        const uploadResult = await uploadImageToDrive(
+          req.file.path,
+          `user_${Date.now()}_${req.file.originalname}`,
+          req.file.mimetype
+        );
+        
+        imageUrl = uploadResult.imageUrl;
+        imageFileId = uploadResult.fileId;
+
+        // Eliminar archivo temporal
+        fs.unlinkSync(req.file.path);
+      } catch (uploadError) {
+        console.error('Error uploading image:', uploadError);
+        // Continuar sin imagen si hay error
+      }
+    }
+
+    // Crear nuevo usuario
     const newUser = new User({
       name,
       email,
@@ -64,17 +85,17 @@ export const signup = async (req, res, next) => {
       phone,
       notes,
       age,
-      address
+      address,
+      imageUrl,
+      imageFileId
     });
 
     const savedUser = await newUser.save();
 
-  
     const token = jwt.sign({ id: savedUser._id }, config.SECRET, {
-      expiresIn: 86400, // 24 horas
+      expiresIn: 86400,
     });
 
-    
     res.status(201).json({
       message: "Usuario registrado con éxito",
       token,
@@ -86,9 +107,14 @@ export const signup = async (req, res, next) => {
         notes: savedUser.notes,
         age: savedUser.age,
         address: savedUser.address,
+        imageUrl: savedUser.imageUrl,
       },
     });
   } catch (error) {
+    // Limpiar archivo temporal si existe
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
     console.error(error);
     res.status(500).json({ message: "Hubo un error en el servidor", error });
   }
@@ -96,19 +122,13 @@ export const signup = async (req, res, next) => {
 
 export const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find();
+    const users = await User.find().select('-password'); // No incluir contraseñas
     res.status(200).json(users);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Error al obtener los usuarios" });
   }
 };
-
-
-
-
-
-
 
 export const updateUser = async (req, res) => {
   try {
@@ -119,55 +139,82 @@ export const updateUser = async (req, res) => {
       return res.status(400).json({ message: "ID inválido" });
     }
 
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
     const updateData = { name, email, phone, address, age, notes };
 
     if (password) {
       updateData.password = await User.encryptPassword(password);
     }
 
+    // Si hay nueva imagen
+    if (req.file) {
+      try {
+        // Eliminar imagen anterior si existe
+        if (user.imageFileId) {
+          await deleteImageFromDrive(user.imageFileId);
+        }
+
+        // Subir nueva imagen
+        const uploadResult = await uploadImageToDrive(
+          req.file.path,
+          `user_${id}_${Date.now()}_${req.file.originalname}`,
+          req.file.mimetype
+        );
+
+        updateData.imageUrl = uploadResult.imageUrl;
+        updateData.imageFileId = uploadResult.fileId;
+
+        // Eliminar archivo temporal
+        fs.unlinkSync(req.file.path);
+      } catch (uploadError) {
+        console.error('Error uploading image:', uploadError);
+      }
+    }
+
     const updatedUser = await User.findByIdAndUpdate(id, updateData, {
       new: true,
-    });
-
-    if (!updatedUser) {
-      return res.status(404).json({ message: "Usuario no encontrado" });
-    }
+    }).select('-password');
 
     res.status(200).json({
       message: "Usuario actualizado",
       user: updatedUser,
     });
   } catch (error) {
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
     console.error(error);
     res.status(500).json({ message: "Error al actualizar usuario" });
   }
 };
 
-
-
-
-
-
-// Función para eliminar un usuario
 export const deleteUser = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Validar que el ID sea válido
         if (!id.match(/^[0-9a-fA-F]{24}$/)) {
             return res.status(400).json({ message: "ID de usuario inválido" });
         }
 
-        // Verificar que el usuario existe
-        const userExists = await User.findById(id);
-        if (!userExists) {
+        const user = await User.findById(id);
+        if (!user) {
             return res.status(404).json({ message: "Usuario no encontrado" });
         }
 
-        // Eliminar el usuario
-        await User.findByIdAndDelete(id);
+        // Eliminar imagen de Google Drive si existe
+        if (user.imageFileId) {
+            try {
+                await deleteImageFromDrive(user.imageFileId);
+            } catch (error) {
+                console.error('Error deleting image from Drive:', error);
+            }
+        }
 
-        console.log("Usuario eliminado con éxito:", id);
+        await User.findByIdAndDelete(id);
 
         res.status(200).json({
             message: "Usuario eliminado con éxito",
@@ -178,7 +225,3 @@ export const deleteUser = async (req, res) => {
         res.status(500).json({ message: "Error al eliminar el usuario", error });
     }
 };
-
-
-
-
