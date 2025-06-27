@@ -5,10 +5,10 @@ import { upload } from "../middlewares/upload.js";
 
 const router = Router();
 
-router.post("/signin", authCtrl.signin);
+router.post("/signin", verifyToken,authCtrl.signin);
 router.post("/signup", upload.single('image'), authCtrl.signup);
-router.get("/users", verifyToken, authCtrl.getAllUsers);
-router.delete("/users/:id", verifyToken, authCtrl.deleteUser);
+router.get("/users",authCtrl.getAllUsers);
+router.delete("/users/:id",authCtrl.deleteUser);
 router.put("/users/:id", verifyToken, upload.single('image'), authCtrl.updateUser);
 
 export default router;

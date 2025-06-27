@@ -9,14 +9,14 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// Crear directorio de uploads temporales si no existe
+
 import fs from 'fs';
 const uploadsDir = path.join(__dirname, 'uploads/temp');
 if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Middlewares
+
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
