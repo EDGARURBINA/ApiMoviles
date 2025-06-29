@@ -5,7 +5,7 @@ import { upload } from "../middlewares/upload.js";
 
 const router = Router();
 
-router.post("/signin", verifyToken,authCtrl.signin);
+router.post("/signin",authCtrl.signin);
 router.post("/signup", upload.single('image'), authCtrl.signup);
 router.get("/users",authCtrl.getAllUsers);
 router.delete("/users/:id",authCtrl.deleteUser);
