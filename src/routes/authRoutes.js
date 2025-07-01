@@ -9,6 +9,6 @@ router.post("/signin",authCtrl.signin);
 router.post("/signup", upload.single('image'), authCtrl.signup);
 router.get("/users",verifyToken,authCtrl.getAllUsers);
 router.delete("/users/:id",authCtrl.deleteUser);
-router.put("/users/:id", upload.single('image'), authCtrl.updateUser);
+router.put("/users/:id",verifyToken, upload.single('image'), authCtrl.updateUser);
 
 export default router;
