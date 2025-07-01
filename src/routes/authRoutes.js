@@ -7,7 +7,7 @@ const router = Router();
 
 router.post("/signin",authCtrl.signin);
 router.post("/signup", upload.single('image'), authCtrl.signup);
-router.get("/users",authCtrl.getAllUsers);
+router.get("/users",verifyToken,authCtrl.getAllUsers);
 router.delete("/users/:id",authCtrl.deleteUser);
 router.put("/users/:id", upload.single('image'), authCtrl.updateUser);
 
