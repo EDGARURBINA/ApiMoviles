@@ -17,4 +17,4 @@ const auth = new google.auth.GoogleAuth({
 export const drive = google.drive({ version: 'v3', auth });
 
 // ID de la carpeta donde guardarás las imágenes (crea una carpeta en tu Google Drive)
-export const FOLDER_ID = '1wZo5tDeCy5Iv-VHGsuDqH1ZD3_t2IvJE';
+export const FOLDER_ID = '19ibC-Jh59c6F_X8FgZsAAs-oNwjpK0R7';
