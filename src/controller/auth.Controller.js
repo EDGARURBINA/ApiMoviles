@@ -167,10 +167,26 @@ export const updateUser = async (req, res) => {
       try {
         // Eliminar imagen anterior si existe
         if (user.imageFileId) {
-          await deleteImageFromDrive(user.imageFileId);
+          console.log(`Attempting to delete previous image: ${user.imageFileId}`);
+          
+          const deleteResult = await deleteImageFromDrive(user.imageFileId);
+          
+          if (deleteResult.success) {
+            if (deleteResult.deleted) {
+              console.log('Previous image deleted successfully');
+            } else if (deleteResult.notFound) {
+              console.log('Previous image was already deleted or not found');
+            } else if (deleteResult.skipped) {
+              console.log('No previous image to delete');
+            }
+          } else {
+            console.warn(`Warning: Could not delete previous image: ${deleteResult.message}`);
+            // NO fallar la operación, solo advertir
+          }
         }
 
         // Subir nueva imagen
+        console.log('Uploading new image...');
         const uploadResult = await uploadImageToDrive(
           req.file.path,
           `user_${id}_${Date.now()}_${req.file.originalname}`,
@@ -180,29 +196,69 @@ export const updateUser = async (req, res) => {
         updateData.imageUrl = uploadResult.imageUrl;
         updateData.imageFileId = uploadResult.fileId;
 
+        console.log(`New image uploaded successfully: ${uploadResult.fileId}`);
+
         // Eliminar archivo temporal
-        fs.unlinkSync(req.file.path);
+        if (fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+
       } catch (uploadError) {
         console.error('Error uploading image:', uploadError);
+        
+        // Limpiar archivo temporal en caso de error
+        if (req.file && fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+        
+        return res.status(500).json({ 
+          message: "Error al subir la imagen", 
+          error: uploadError.message 
+        });
       }
     }
 
+    // Actualizar usuario en la base de datos
     const updatedUser = await User.findByIdAndUpdate(id, updateData, {
       new: true,
     }).select('-password');
+
+    console.log(`User ${id} updated successfully`);
 
     res.status(200).json({
       message: "Usuario actualizado",
       user: updatedUser,
     });
+
   } catch (error) {
+    // Limpiar archivo temporal en caso de error general
     if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (cleanupError) {
+        console.error('Error cleaning up temp file:', cleanupError);
+      }
     }
-    console.error(error);
-    res.status(500).json({ message: "Error al actualizar usuario" });
+    
+    console.error('Error updating user:', error);
+    res.status(500).json({ 
+      message: "Error al actualizar usuario",
+      error: error.message 
+    });
   }
 };
+
+
+
+
+
+
+
+
+
+
+
+
 
 export const deleteUser = async (req, res) => {
     try {
