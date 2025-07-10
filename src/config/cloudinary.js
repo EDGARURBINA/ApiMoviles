@@ -5,16 +5,17 @@ import dotenv from 'dotenv';
 // Asegurar que dotenv esté cargado
 dotenv.config();
 
-// Configuración con URL completa
-if (process.env.CLOUDINARY_URL) {
-  // Cloudinary automáticamente parsea la URL cuando está en CLOUDINARY_URL
-  cloudinary.config({
-    secure: true
-  });
-  console.log('✅ Cloudinary configurado correctamente');
-} else {
-  console.error('❌ CLOUDINARY_URL no está definida en las variables de entorno');
-  console.log('🔍 Available env vars:', Object.keys(process.env).filter(key => key.includes('CLOUD')));
-}
+// Configuración con variables separadas (más confiable)
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true
+});
+
+console.log('🔍 Cloudinary config debug:');
+console.log('Cloud name:', process.env.CLOUDINARY_CLOUD_NAME);
+console.log('API Key:', process.env.CLOUDINARY_API_KEY ? 'EXISTS' : 'MISSING');
+console.log('API Secret:', process.env.CLOUDINARY_API_SECRET ? 'EXISTS' : 'MISSING');
 
 export default cloudinary;
