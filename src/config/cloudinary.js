@@ -1,5 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
 
+
 // Configuración con URL completa
 if (process.env.CLOUDINARY_URL) {
   // Cloudinary automáticamente parsea la URL cuando está en CLOUDINARY_URL
