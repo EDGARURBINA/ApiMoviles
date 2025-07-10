@@ -41,6 +41,11 @@ const userSchema = new Schema({
     type: String,
     default: null,
   },
+
+imagePublicId: {
+  type: String,
+  default: null,
+},
   imageFileId: {
     type: String,
     default: null,
