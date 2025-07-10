@@ -1,9 +1,11 @@
 import jwt from 'jsonwebtoken';
 import config from '../config.js'; 
+import { 
+  uploadImageToCloudinary, 
+  deleteImageFromCloudinary, 
+  cleanupTempFile 
+} from '../services/cloudinaryService.js';
 import User from '../models/User.js';
-import Role from '../models/Role.js';
-import { uploadImageToDrive, deleteImageFromDrive } from '../services/googleDriveService.js';
-import fs from 'fs';
 
 export const signin = async (req, res, next) => {
     try {
@@ -43,48 +45,47 @@ export const signin = async (req, res, next) => {
 
 export const signup = async (req, res, next) => {
   try {
-    // Cuando usamos multipart/form-data, los datos vienen en req.body pero pueden necesitar procesamiento
     const { name, email, password, phone, notes, age, address } = req.body;
     
-    // Debug: ver qué está llegando
     console.log('req.body:', req.body);
     console.log('req.file:', req.file);
     
-    // Validación manual ya que los datos vienen como string desde form-data
     if (!name || !email || !password) {
       return res.status(400).json({ 
         message: "Los campos name, email y password son obligatorios" 
       });
     }
 
-    // Verifica si el usuario ya existe
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ message: "El correo electrónico ya está registrado" });
     }
 
-    // Encriptar la contraseña
     const hashedPassword = await User.encryptPassword(password);
 
     let imageUrl = null;
-    let imageFileId = null;
+    let imagePublicId = null; // ← Cambio: imageFileId -> imagePublicId
 
-    // Si hay una imagen, subirla a Google Drive
+    // Si hay una imagen, subirla a Cloudinary
     if (req.file) {
       try {
-        const uploadResult = await uploadImageToDrive(
+        console.log('Uploading image to Cloudinary...');
+        const uploadResult = await uploadImageToCloudinary(
           req.file.path,
-          `user_${Date.now()}_${req.file.originalname}`,
-          req.file.mimetype
+          `user_${Date.now()}_${req.file.originalname}`
         );
         
         imageUrl = uploadResult.imageUrl;
-        imageFileId = uploadResult.fileId;
+        imagePublicId = uploadResult.fileId; // ← Cambio: imageFileId -> imagePublicId
 
-        // Eliminar archivo temporal
-        fs.unlinkSync(req.file.path);
+        console.log(`Image uploaded successfully: ${uploadResult.fileId}`);
+
+        // Limpiar archivo temporal
+        cleanupTempFile(req.file.path);
       } catch (uploadError) {
-        console.error('Error uploading image:', uploadError);
+        console.error('Error uploading image to Cloudinary:', uploadError);
+        // Limpiar archivo temporal
+        cleanupTempFile(req.file.path);
         // Continuar sin imagen si hay error
       }
     }
@@ -99,7 +100,7 @@ export const signup = async (req, res, next) => {
       age: age ? parseInt(age) : null,
       address: address || '',
       imageUrl,
-      imageFileId
+      imagePublicId // ← Cambio: imageFileId -> imagePublicId
     });
 
     const savedUser = await newUser.save();
@@ -124,8 +125,8 @@ export const signup = async (req, res, next) => {
     });
   } catch (error) {
     // Limpiar archivo temporal si existe
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+    if (req.file) {
+      cleanupTempFile(req.file.path);
     }
     console.error(error);
     res.status(500).json({ message: "Hubo un error en el servidor", error });
@@ -134,7 +135,7 @@ export const signup = async (req, res, next) => {
 
 export const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().select('-password'); // No incluir contraseñas
+    const users = await User.find().select('-password');
     res.status(200).json(users);
   } catch (error) {
     console.error(error);
@@ -166,10 +167,10 @@ export const updateUser = async (req, res) => {
     if (req.file) {
       try {
         // Eliminar imagen anterior si existe
-        if (user.imageFileId) {
-          console.log(`Attempting to delete previous image: ${user.imageFileId}`);
+        if (user.imagePublicId) { // ← Cambio: imageFileId -> imagePublicId
+          console.log(`Attempting to delete previous image: ${user.imagePublicId}`);
           
-          const deleteResult = await deleteImageFromDrive(user.imageFileId);
+          const deleteResult = await deleteImageFromCloudinary(user.imagePublicId);
           
           if (deleteResult.success) {
             if (deleteResult.deleted) {
@@ -181,35 +182,29 @@ export const updateUser = async (req, res) => {
             }
           } else {
             console.warn(`Warning: Could not delete previous image: ${deleteResult.message}`);
-            // NO fallar la operación, solo advertir
           }
         }
 
-        // Subir nueva imagen
-        console.log('Uploading new image...');
-        const uploadResult = await uploadImageToDrive(
+        // Subir nueva imagen a Cloudinary
+        console.log('Uploading new image to Cloudinary...');
+        const uploadResult = await uploadImageToCloudinary(
           req.file.path,
-          `user_${id}_${Date.now()}_${req.file.originalname}`,
-          req.file.mimetype
+          `user_${id}_${Date.now()}_${req.file.originalname}`
         );
 
         updateData.imageUrl = uploadResult.imageUrl;
-        updateData.imageFileId = uploadResult.fileId;
+        updateData.imagePublicId = uploadResult.fileId; // ← Cambio: imageFileId -> imagePublicId
 
         console.log(`New image uploaded successfully: ${uploadResult.fileId}`);
 
-        // Eliminar archivo temporal
-        if (fs.existsSync(req.file.path)) {
-          fs.unlinkSync(req.file.path);
-        }
+        // Limpiar archivo temporal
+        cleanupTempFile(req.file.path);
 
       } catch (uploadError) {
-        console.error('Error uploading image:', uploadError);
+        console.error('Error uploading image to Cloudinary:', uploadError);
         
         // Limpiar archivo temporal en caso de error
-        if (req.file && fs.existsSync(req.file.path)) {
-          fs.unlinkSync(req.file.path);
-        }
+        cleanupTempFile(req.file.path);
         
         return res.status(500).json({ 
           message: "Error al subir la imagen", 
@@ -232,12 +227,8 @@ export const updateUser = async (req, res) => {
 
   } catch (error) {
     // Limpiar archivo temporal en caso de error general
-    if (req.file && fs.existsSync(req.file.path)) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (cleanupError) {
-        console.error('Error cleaning up temp file:', cleanupError);
-      }
+    if (req.file) {
+      cleanupTempFile(req.file.path);
     }
     
     console.error('Error updating user:', error);
@@ -247,18 +238,6 @@ export const updateUser = async (req, res) => {
     });
   }
 };
-
-
-
-
-
-
-
-
-
-
-
-
 
 export const deleteUser = async (req, res) => {
     try {
@@ -273,12 +252,19 @@ export const deleteUser = async (req, res) => {
             return res.status(404).json({ message: "Usuario no encontrado" });
         }
 
-        // Eliminar imagen de Google Drive si existe
-        if (user.imageFileId) {
+        // Eliminar imagen de Cloudinary si existe
+        if (user.imagePublicId) { // ← Cambio: imageFileId -> imagePublicId
             try {
-                await deleteImageFromDrive(user.imageFileId);
+                console.log(`Deleting image for user deletion: ${user.imagePublicId}`);
+                const deleteResult = await deleteImageFromCloudinary(user.imagePublicId);
+                
+                if (deleteResult.success) {
+                    console.log('User image deleted successfully');
+                } else {
+                    console.warn(`Warning: Could not delete user image: ${deleteResult.message}`);
+                }
             } catch (error) {
-                console.error('Error deleting image from Drive:', error);
+                console.error('Error deleting image from Cloudinary:', error);
             }
         }
 
