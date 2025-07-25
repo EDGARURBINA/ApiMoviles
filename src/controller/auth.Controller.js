@@ -135,13 +135,71 @@ export const signup = async (req, res, next) => {
 
 export const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().select('-password');
+    // 🔧 FILTRAR USUARIOS NO ELIMINADOS SOLAMENTE
+    const users = await User.find({ 
+      $or: [
+        { isDeleted: { $exists: false } }, // Usuarios sin campo isDeleted (datos antiguos)
+        { isDeleted: false }               // Usuarios con isDeleted = false
+      ]
+    }).select('-password');
+    
+    console.log(`📋 Obteniendo usuarios activos: ${users.length} encontrados`);
+    
     res.status(200).json(users);
   } catch (error) {
-    console.error(error);
+    console.error('❌ Error obteniendo usuarios:', error);
     res.status(500).json({ message: "Error al obtener los usuarios" });
   }
 };
+
+// 🆕 NUEVO: Endpoint para verificar estado de la DB (AGREGAR ESTE)
+export const getDbStatus = async (req, res) => {
+  try {
+    const activeUsers = await User.countDocuments({ 
+      $or: [
+        { isDeleted: { $exists: false } },
+        { isDeleted: false }
+      ]
+    });
+    
+    const deletedUsers = await User.countDocuments({ isDeleted: true });
+    const totalUsers = await User.countDocuments();
+    
+    console.log(`📊 Estado DB: ${activeUsers} activos, ${deletedUsers} eliminados, ${totalUsers} total`);
+    
+    res.status(200).json({
+      activeUsers,
+      deletedUsers,
+      totalUsers,
+      serverTime: new Date().toISOString(),
+      dbStatus: 'connected'
+    });
+  } catch (error) {
+    console.error('❌ Error obteniendo estado DB:', error);
+    res.status(500).json({ message: "Error obteniendo estado de base de datos" });
+  }
+};
+
+// 🆕 NUEVO: Endpoint para ver usuarios eliminados (AGREGAR ESTE)
+export const getDeletedUsers = async (req, res) => {
+  try {
+    const deletedUsers = await User.find({ 
+      isDeleted: true 
+    }).select('-password');
+    
+    console.log(`🗑️ Usuarios eliminados: ${deletedUsers.length} encontrados`);
+    
+    res.status(200).json({
+      message: "Usuarios eliminados obtenidos",
+      count: deletedUsers.length,
+      users: deletedUsers
+    });
+  } catch (error) {
+    console.error('❌ Error obteniendo usuarios eliminados:', error);
+    res.status(500).json({ message: "Error al obtener usuarios eliminados" });
+  }
+};
+
 
 export const updateUser = async (req, res) => {
   try {
