@@ -43,95 +43,252 @@ export const signin = async (req, res, next) => {
     }
 };
 
+
+const processingEmails = new Set();
+
 export const signup = async (req, res, next) => {
   try {
     const { name, email, password, phone, notes, age, address } = req.body;
     
+    // 🔧 NORMALIZAR EMAIL DESDE EL INICIO
+    const normalizedEmail = email?.toLowerCase().trim();
+    
+    console.log('🔄 Procesando signup:', normalizedEmail);
     console.log('req.body:', req.body);
     console.log('req.file:', req.file);
     
-    if (!name || !email || !password) {
+    if (!name || !normalizedEmail || !password) {
       return res.status(400).json({ 
         message: "Los campos name, email y password son obligatorios" 
       });
     }
 
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({ message: "El correo electrónico ya está registrado" });
-    }
-
-    const hashedPassword = await User.encryptPassword(password);
-
-    let imageUrl = null;
-    let imagePublicId = null; // ← Cambio: imageFileId -> imagePublicId
-
-    // Si hay una imagen, subirla a Cloudinary
-    if (req.file) {
-      try {
-        console.log('Uploading image to Cloudinary...');
-        const uploadResult = await uploadImageToCloudinary(
-          req.file.path,
-          `user_${Date.now()}_${req.file.originalname}`
-        );
-        
-        imageUrl = uploadResult.imageUrl;
-        imagePublicId = uploadResult.fileId; // ← Cambio: imageFileId -> imagePublicId
-
-        console.log(`Image uploaded successfully: ${uploadResult.fileId}`);
-
-        // Limpiar archivo temporal
+    // 🆕 VERIFICAR SI YA SE ESTÁ PROCESANDO ESTE EMAIL
+    if (processingEmails.has(normalizedEmail)) {
+      console.log(`⏳ Email ${normalizedEmail} ya se está procesando, rechazando request duplicado`);
+      
+      // Limpiar archivo temporal si existe
+      if (req.file) {
         cleanupTempFile(req.file.path);
-      } catch (uploadError) {
-        console.error('Error uploading image to Cloudinary:', uploadError);
-        // Limpiar archivo temporal
-        cleanupTempFile(req.file.path);
-        // Continuar sin imagen si hay error
       }
+      
+      return res.status(409).json({ 
+        message: "Este email ya se está procesando, por favor espera",
+        code: "EMAIL_PROCESSING"
+      });
     }
 
-    // Crear nuevo usuario
-    const newUser = new User({
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      password: hashedPassword,
-      phone: phone || '',
-      notes: notes || '',
-      age: age ? parseInt(age) : null,
-      address: address || '',
-      imageUrl,
-      imagePublicId // ← Cambio: imageFileId -> imagePublicId
-    });
+    // 🆕 MARCAR EMAIL COMO "EN PROCESAMIENTO"
+    processingEmails.add(normalizedEmail);
 
-    const savedUser = await newUser.save();
+    try {
+      // ✅ VERIFICAR SI EL EMAIL YA EXISTE
+      const userExists = await User.findOne({ email: normalizedEmail });
+      if (userExists) {
+        console.log(`📋 Usuario ya existe: ${normalizedEmail} (ID: ${userExists._id})`);
+        
+        // Limpiar archivo temporal
+        if (req.file) {
+          cleanupTempFile(req.file.path);
+        }
+        
+        // 🔧 RETORNAR DATOS DEL USUARIO EXISTENTE EN LUGAR DE ERROR
+        const token = jwt.sign({ id: userExists._id }, config.SECRET, {
+          expiresIn: 86400,
+        });
 
-    const token = jwt.sign({ id: savedUser._id }, config.SECRET, {
-      expiresIn: 86400,
-    });
+        return res.status(200).json({ // 200 en lugar de 400
+          message: "Usuario ya registrado, iniciando sesión",
+          token,
+          user: {
+            _id: userExists._id,
+            name: userExists.name,
+            email: userExists.email,
+            phone: userExists.phone,
+            notes: userExists.notes,
+            age: userExists.age,
+            address: userExists.address,
+            imageUrl: userExists.imageUrl,
+          },
+          code: "USER_EXISTS"
+        });
+      }
 
-    res.status(201).json({
-      message: "Usuario registrado con éxito",
-      token,
-      user: {
-        _id: savedUser._id,
-        name: savedUser.name,
-        email: savedUser.email,
-        phone: savedUser.phone,
-        notes: savedUser.notes,
-        age: savedUser.age,
-        address: savedUser.address,
-        imageUrl: savedUser.imageUrl,
-      },
-    });
+      const hashedPassword = await User.encryptPassword(password);
+
+      let imageUrl = null;
+      let imagePublicId = null;
+
+      // Si hay una imagen, subirla a Cloudinary
+      if (req.file) {
+        try {
+          console.log(`🖼️ Subiendo imagen para ${normalizedEmail}...`);
+          const uploadResult = await uploadImageToCloudinary(
+            req.file.path,
+            `user_${Date.now()}_${req.file.originalname}`
+          );
+          
+          imageUrl = uploadResult.imageUrl;
+          imagePublicId = uploadResult.fileId;
+
+          console.log(`✅ Imagen subida exitosamente: ${uploadResult.fileId}`);
+
+          // Limpiar archivo temporal
+          cleanupTempFile(req.file.path);
+        } catch (uploadError) {
+          console.error('❌ Error subiendo imagen:', uploadError);
+          // Limpiar archivo temporal
+          cleanupTempFile(req.file.path);
+          // Continuar sin imagen si hay error
+        }
+      }
+
+      // 🆕 CREAR USUARIO NUEVO
+      console.log(`🆕 Creando nuevo usuario: ${normalizedEmail}`);
+      const newUser = new User({
+        name: name.trim(),
+        email: normalizedEmail, // Usar email normalizado
+        password: hashedPassword,
+        phone: phone || '',
+        notes: notes || '',
+        age: age ? parseInt(age) : null,
+        address: address || '',
+        imageUrl,
+        imagePublicId
+      });
+
+      const savedUser = await newUser.save();
+
+      const token = jwt.sign({ id: savedUser._id }, config.SECRET, {
+        expiresIn: 86400,
+      });
+
+      console.log(`✅ Usuario creado exitosamente: ${savedUser._id}`);
+
+      res.status(201).json({
+        message: "Usuario registrado con éxito",
+        token,
+        user: {
+          _id: savedUser._id,
+          name: savedUser.name,
+          email: savedUser.email,
+          phone: savedUser.phone,
+          notes: savedUser.notes,
+          age: savedUser.age,
+          address: savedUser.address,
+          imageUrl: savedUser.imageUrl,
+        },
+      });
+
+    } catch (error) {
+      // 🔧 MANEJO ESPECÍFICO DE ERROR DE EMAIL DUPLICADO
+      if (error.code === 11000 && error.keyPattern?.email) {
+        console.log(`📋 Error de duplicado detectado para: ${normalizedEmail}`);
+        
+        // Limpiar archivo temporal
+        if (req.file) {
+          cleanupTempFile(req.file.path);
+        }
+        
+        try {
+          // Buscar el usuario existente y retornar sus datos
+          const existingUser = await User.findOne({ email: normalizedEmail });
+          
+          if (existingUser) {
+            console.log(`✅ Usuario duplicado encontrado: ${existingUser._id}`);
+            
+            const token = jwt.sign({ id: existingUser._id }, config.SECRET, {
+              expiresIn: 86400,
+            });
+
+            return res.status(200).json({
+              message: "Usuario ya registrado, iniciando sesión",
+              token,
+              user: {
+                _id: existingUser._id,
+                name: existingUser.name,
+                email: existingUser.email,
+                phone: existingUser.phone,
+                notes: existingUser.notes,
+                age: existingUser.age,
+                address: existingUser.address,
+                imageUrl: existingUser.imageUrl,
+              },
+              code: "DUPLICATE_HANDLED"
+            });
+          }
+        } catch (findError) {
+          console.error(`❌ Error buscando usuario duplicado: ${findError.message}`);
+        }
+        
+        return res.status(409).json({ 
+          message: "El email ya está registrado",
+          code: "EMAIL_DUPLICATE"
+        });
+      }
+      
+      // Error genérico
+      throw error;
+    }
+
   } catch (error) {
     // Limpiar archivo temporal si existe
     if (req.file) {
       cleanupTempFile(req.file.path);
     }
-    console.error(error);
-    res.status(500).json({ message: "Hubo un error en el servidor", error });
+    
+    console.error('❌ Error en signup:', error);
+    res.status(500).json({ 
+      message: "Hubo un error en el servidor", 
+      error: error.message 
+    });
+  } finally {
+    // 🆕 ALWAYS REMOVE FROM PROCESSING SET
+    if (req.body.email) {
+      const normalizedEmail = req.body.email.toLowerCase().trim();
+      processingEmails.delete(normalizedEmail);
+      console.log(`🧹 Email removido del procesamiento: ${normalizedEmail}`);
+    }
   }
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 export const getAllUsers = async (req, res) => {
   try {
