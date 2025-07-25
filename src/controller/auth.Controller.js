@@ -253,7 +253,7 @@ export const deleteUser = async (req, res) => {
         }
 
         // Eliminar imagen de Cloudinary si existe
-        if (user.imagePublicId) { // ← Cambio: imageFileId -> imagePublicId
+        if (user.imagePublicId) {
             try {
                 console.log(`Deleting image for user deletion: ${user.imagePublicId}`);
                 const deleteResult = await deleteImageFromCloudinary(user.imagePublicId);
@@ -268,14 +268,19 @@ export const deleteUser = async (req, res) => {
             }
         }
 
-        await User.findByIdAndDelete(id);
+        // 🔄 CAMBIO: Usar soft delete en lugar de eliminación física
+        const deletedUser = await user.softDelete().save();
 
         res.status(200).json({
             message: "Usuario eliminado con éxito",
-            deletedUserId: id
+            deletedUserId: id,
+            syncVersion: deletedUser.syncVersion,
+            lastModified: deletedUser.lastModified
         });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Error al eliminar el usuario", error });
     }
 };
+
+
