@@ -169,34 +169,109 @@ export const getSyncStats = async (req, res) => {
 
 // ==================== FUNCIONES AUXILIARES ====================
 
+// Función createUserFromSync CORREGIDA - Manejo de duplicados
 const createUserFromSync = async (operation) => {
     try {
+        console.log(`🔄 Procesando creación de usuario: ${operation.data.email}`);
+        
+        // ✅ VERIFICAR SI EL EMAIL YA EXISTE ANTES DE CREAR
+        const existingUser = await User.findOne({ 
+            email: operation.data.email.toLowerCase().trim() 
+        });
+        
+        if (existingUser) {
+            console.log(`📋 Usuario ya existe: ${operation.data.email} (ID: ${existingUser._id})`);
+            return {
+                success: true, // ✅ RETORNAR ÉXITO porque el usuario YA existe
+                data: existingUser,
+                message: "Usuario ya existía en la base de datos"
+            };
+        }
+        
+        // 🆕 CREAR USUARIO NUEVO SOLO SI NO EXISTE
+        console.log(`🆕 Creando nuevo usuario: ${operation.data.email}`);
+        
         const hashedPassword = await User.encryptPassword(
             operation.data.password || 'defaultPassword123'
         );
         
         const userData = {
             ...operation.data,
+            email: operation.data.email.toLowerCase().trim(), // ✅ Normalizar email
             password: hashedPassword,
             lastModified: new Date(),
             syncVersion: 1,
-            clientId: operation.clientId || null
+            clientId: operation.clientId || null,
+            isDeleted: false // ✅ Asegurar que no esté marcado como eliminado
         };
         
         const newUser = new User(userData);
         const savedUser = await newUser.save();
         
+        console.log(`✅ Usuario creado exitosamente: ${savedUser._id}`);
+        
         return {
             success: true,
-            data: savedUser
+            data: savedUser,
+            message: "Usuario creado exitosamente"
         };
+        
     } catch (error) {
+        console.error(`❌ Error en createUserFromSync: ${error.message}`);
+        
+        // ✅ MANEJO ESPECÍFICO DE ERROR DE EMAIL DUPLICADO (MongoDB)
+        if (error.code === 11000 && error.keyPattern?.email) {
+            console.log(`📋 Error de email duplicado detectado para: ${operation.data.email}`);
+            
+            try {
+                // Buscar el usuario existente y retornarlo como éxito
+                const existingUser = await User.findOne({ 
+                    email: operation.data.email.toLowerCase().trim() 
+                });
+                
+                if (existingUser) {
+                    console.log(`✅ Usuario duplicado encontrado: ${existingUser._id}`);
+                    return {
+                        success: true, // ✅ ÉXITO porque el usuario existe
+                        data: existingUser,
+                        message: "Usuario ya existía (detectado por error de duplicado)"
+                    };
+                }
+            } catch (findError) {
+                console.error(`❌ Error buscando usuario duplicado: ${findError.message}`);
+            }
+        }
+        
+        // ✅ MANEJO DE OTROS ERRORES DE VALIDACIÓN
+        if (error.name === 'ValidationError') {
+            console.error(`❌ Error de validación: ${error.message}`);
+            return { 
+                success: false, 
+                error: `Error de validación: ${error.message}`,
+                code: 'VALIDATION_ERROR'
+            };
+        }
+        
+        // ✅ ERROR GENÉRICO
         return { 
             success: false, 
-            error: error.message 
+            error: error.message,
+            code: error.code || 'UNKNOWN_ERROR'
         };
     }
 };
+
+
+
+
+
+
+
+
+
+
+
+
 
 const updateUserFromSync = async (operation) => {
     try {
