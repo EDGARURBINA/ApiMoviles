@@ -275,21 +275,6 @@ export const signup = async (req, res, next) => {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 export const getAllUsers = async (req, res) => {
   try {
     // 🔧 FILTRAR USUARIOS NO ELIMINADOS SOLAMENTE
