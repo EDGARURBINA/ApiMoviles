@@ -1,10 +1,9 @@
 import { Router } from "express";
 import * as authCtrl from "../controller/auth.Controller.js";
-import { verifyToken, isAdmin } from "../middlewares/authJwt.js";
 import { upload } from "../middlewares/upload.js";
 
 const router = Router();
-
+//quite el jwt 
 router.post("/signin",authCtrl.signin);
 router.post("/signup", upload.single('image'), authCtrl.signup);
 router.get("/users", authCtrl.getAllUsers);
